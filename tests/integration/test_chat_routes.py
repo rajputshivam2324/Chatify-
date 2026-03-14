@@ -27,14 +27,26 @@ class TestChatRoutes:
     """Integration tests for chat routes."""
 
     @pytest.mark.asyncio
-    @patch("app.api.routes.chat.chat_service.process_message")
+    @patch("app.services.chat_service.process_message")
     async def test_chat_endpoint(self, mock_process):
         """Test /chat POST endpoint."""
         from app.schemas.chat import ChatResponse
         from app.main import app
-        from fastapi import Depends
         from app.core.dependencies import get_current_user
-        from app.api.routes.auth import router
+        from app.schemas.auth import UserOut
+
+        mock_user = UserOut(
+            id=uuid.uuid4(),
+            email="test@example.com",
+            name="Test User",
+            avatar_url=None,
+            created_at=__import__('datetime').datetime.now()
+        )
+
+        async def mock_get_current_user():
+            return mock_user
+
+        app.dependency_overrides[get_current_user] = mock_get_current_user
 
         mock_process.return_value = ChatResponse(
             reply="Hello!",
@@ -43,8 +55,17 @@ class TestChatRoutes:
         )
 
         with TestClient(app) as client:
-            client.cookies.set("session", "test-session-id")
-            pass
+            response = client.post(
+                "/chat",
+                json={"user_message": "Hi", "session_id": "test-session"}
+            )
+            assert response.status_code == 200
+            data = response.json()
+            assert data["reply"] == "Hello!"
+            assert data["session_id"] == "test-session"
+            assert data["model"] == "llama"
+
+        app.dependency_overrides.clear()
 
     def test_health_endpoint(self):
         """Test /health endpoint."""

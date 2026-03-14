@@ -1,12 +1,16 @@
 import uuid
 from typing import Any, TypedDict
 
+import structlog
+
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 
 from app.services.llm_service import LLMInvocationError, invoke_llm
 
 from . import long_term, short_term
+
+logger = structlog.get_logger()
 
 
 class MessagesState(TypedDict):
@@ -19,14 +23,25 @@ class MessagesState(TypedDict):
 
 
 async def retrieve_short_term(state: MessagesState) -> dict[str, Any]:
-    """Retrieve short-term memory from Redis."""
+    """Retrieve short-term memory from Redis and merge with current user message."""
     session_id = state["session_id"]
-    messages = await short_term.get_messages(session_id)
-    return {"messages": messages}
+    stored_messages = await short_term.get_messages(session_id)
+
+    # Get the current user message from state (passed from run_graph)
+    current_messages = state.get("messages", [])
+
+    # Merge: stored history + current user message
+    # Avoid duplicates by checking if last stored message matches current user message
+    if current_messages:
+        user_msg = current_messages[-1]
+        if not stored_messages or stored_messages[-1] != user_msg:
+            stored_messages.append(user_msg)
+
+    return {"messages": stored_messages}
 
 
 async def retrieve_long_term(state: MessagesState) -> dict[str, Any]:
-    """Retrieve long-term memory from FAISS."""
+    """Retrieve long-term memory from ChromaDB."""
     user_id = uuid.UUID(state["user_id"])
     user_message = state["messages"][-1]["content"] if state["messages"] else ""
 
@@ -49,7 +64,13 @@ async def call_llm(state: MessagesState) -> dict[str, Any]:
     try:
         reply = await invoke_llm(model_key, messages)
     except LLMInvocationError as e:
-        reply = f"I apologize, but I encountered an error processing your request. Please try again."
+        logger.error("LLM invocation failed, falling back to llama", model=model_key, error=str(e))
+        try:
+            reply = await invoke_llm("llama", messages)
+            logger.info("Fallback to llama succeeded", original_model=model_key)
+        except LLMInvocationError as fallback_error:
+            logger.error("Fallback also failed", error=str(fallback_error))
+            reply = "I apologize, but I encountered an error processing your request. Please try again."
 
     return {"reply": reply}
 
@@ -68,15 +89,25 @@ async def save_short_term(state: MessagesState) -> dict[str, Any]:
 
 
 async def save_long_term(state: MessagesState) -> dict[str, Any]:
-    """Save to long-term memory in FAISS."""
+    """Save to long-term memory in ChromaDB."""
     user_id = uuid.UUID(state["user_id"])
     messages = state["messages"]
+    
+    logger.info("save_long_term called", user_id=str(user_id), message_count=len(messages))
 
     if messages:
         user_msg = messages[-1]["content"]
         assistant_reply = state["reply"]
         combined = f"User: {user_msg}\nAssistant: {assistant_reply}"
-        await long_term.long_term_memory.add_memory(user_id, combined)
+        
+        try:
+            await long_term.long_term_memory.add_memory(user_id, combined)
+            logger.info("Long-term memory saved successfully", user_id=str(user_id))
+        except Exception as e:
+            logger.error("Failed to save long-term memory", user_id=str(user_id), error=str(e), exc_info=True)
+            raise
+    else:
+        logger.warning("No messages to save to long-term memory", user_id=str(user_id))
 
     return {}
 

@@ -4,7 +4,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.chat_session import ChatSession
-from app.db.repositories import session_repo
+from app.db.repositories.session_repo import session_repo
 
 
 async def get_or_create_session(

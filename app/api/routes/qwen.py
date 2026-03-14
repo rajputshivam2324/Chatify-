@@ -9,7 +9,7 @@ from app.db.repositories import message_repo, session_repo
 from app.schemas.auth import UserOut
 from app.schemas.chat import ChatRequest, ChatResponse, HistoryResponse, MessageOut
 
-from ...db.session import get_db
+from app.db.session import get_db
 
 router = APIRouter(prefix="/qwen", tags=["qwen"])
 

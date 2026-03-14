@@ -18,13 +18,21 @@ async def process_message(
     db: AsyncSession,
 ) -> ChatResponse:
     """
-    Orchestrates: memory read -> LLM call -> memory write -> DB persist
+    Orchestrates: session -> save user msg -> LLM call -> save assistant msg
     """
     db_session = await session_service.get_or_create_session(
         db=db,
         user_id=user_id,
         session_id=session_id,
         model_name=model_key,
+    )
+
+    # Save user message FIRST (before LLM call) so it's persisted even if LLM fails
+    await message_repo.create(
+        db=db,
+        session_id=db_session.id,
+        role="user",
+        content=user_message,
     )
 
     reply = await graph.run_graph(
@@ -34,12 +42,7 @@ async def process_message(
         user_message=user_message,
     )
 
-    await message_repo.create(
-        db=db,
-        session_id=db_session.id,
-        role="user",
-        content=user_message,
-    )
+    # Save assistant message after successful LLM response
     await message_repo.create(
         db=db,
         session_id=db_session.id,

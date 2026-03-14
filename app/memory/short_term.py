@@ -1,6 +1,6 @@
 import json
 
-from app.cache.redis_client import cache_get, cache_delete
+from app.cache.redis_client import cache_get, cache_delete, cache_set
 from app.core.config import get_settings
 
 settings = get_settings()

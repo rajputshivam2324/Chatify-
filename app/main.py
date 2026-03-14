@@ -8,6 +8,7 @@ from app.api.routes import auth, chat, deepseek, gemma, image, qwen
 from app.cache.redis_client import close_redis, init_redis
 from app.core.config import get_settings
 from app.db.session import close_db, init_db
+from app.memory import init_chroma
 
 settings = get_settings()
 
@@ -29,6 +30,7 @@ async def lifespan(app: FastAPI):
 
     await init_redis(settings.redis_url)
     await init_db()
+    await init_chroma()
 
     logger.info("Application started successfully")
 

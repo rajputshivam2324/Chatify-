@@ -1,8 +1,9 @@
 from typing import Annotated
 
 import base64
+import binascii
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import StreamingResponse
 
 from app.core.dependencies import require_auth
@@ -33,7 +34,10 @@ async def chrono_edit(
     user: Annotated[UserOut, Depends(require_auth)],
 ) -> Response:
     """Edit an image using ChronoEdit."""
-    image_bytes = base64.b64decode(body.image_data)
+    try:
+        image_bytes = base64.b64decode(body.image_data)
+    except (binascii.Error, ValueError) as e:
+        raise HTTPException(status_code=400, detail=f"Invalid base64 image data: {str(e)}")
 
     result = await image_service.edit_image(image_bytes, body.prompt)
 

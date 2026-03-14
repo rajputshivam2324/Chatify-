@@ -29,33 +29,24 @@ MODEL_CONFIGS: dict[str, ModelConfig] = {
         temperature=0.7,
     ),
     "qwen": ModelConfig(
-        model_id="Qwen/Qwen2.5-VL-32B-Instruct",
-        provider="fireworks-ai",
-        max_tokens=25000,
-        temperature=1.0,
+        model_id="Qwen/Qwen2.5-7B-Instruct",
+        provider="featherless-ai",
+        max_tokens=8000,
+        temperature=0.7,
     ),
     "gemma": ModelConfig(
-        model_id="google/gemma-2-9b-it",
-        provider=None,
+        model_id="google/gemma-2-9b",
+        provider="featherless-ai",
         max_tokens=5000,
         temperature=0.7,
     ),
     "deepseek": ModelConfig(
-        model_id="deepseek-ai/DeepSeek-R1",
-        provider="sambanova",
-        max_tokens=25000,
-        temperature=1.0,
+        model_id="deepseek-ai/DeepSeek-V3",
+        provider="featherless-ai",
+        max_tokens=8000,
+        temperature=0.7,
     ),
 }
-
-_client: InferenceClient | None = None
-
-
-def _get_client() -> InferenceClient:
-    global _client
-    if _client is None:
-        _client = InferenceClient(token=settings.hf_token)
-    return _client
 
 
 async def invoke_llm(model_key: str, messages: list[dict[str, Any]]) -> str:
@@ -67,20 +58,23 @@ async def invoke_llm(model_key: str, messages: list[dict[str, Any]]) -> str:
         raise LLMInvocationError(f"Unknown model: {model_key}")
 
     config = MODEL_CONFIGS[model_key]
-    client = _get_client()
+    
+    # Create client with or without provider
+    if config.provider:
+        client = InferenceClient(
+            provider=config.provider,
+            api_key=settings.hf_token,
+        )
+    else:
+        client = InferenceClient(token=settings.hf_token)
 
     try:
-        kwargs: dict[str, Any] = {
-            "model": config.model_id,
-            "messages": messages,
-            "max_tokens": config.max_tokens,
-            "temperature": config.temperature,
-        }
-
-        if config.provider:
-            kwargs["provider"] = config.provider
-
-        response = client.chat_completion(**kwargs)
+        response = client.chat_completion(
+            model=config.model_id,
+            messages=messages,
+            max_tokens=config.max_tokens,
+            temperature=config.temperature,
+        )
 
         if not response.choices or not response.choices[0].message:
             raise LLMInvocationError(f"Empty response from {model_key}")

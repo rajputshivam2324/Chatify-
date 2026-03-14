@@ -3,13 +3,13 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.routes import chat as chat_routes
+from app.api.routes import handle_chat
 from app.core.dependencies import rate_limit, require_auth
 from app.db.repositories import message_repo
 from app.schemas.auth import UserOut
 from app.schemas.chat import ChatRequest, ChatResponse, HistoryResponse, MessageOut
 
-from ...db.session import get_db
+from app.db.session import get_db
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -22,7 +22,7 @@ async def send_message(
     db: AsyncSession = Depends(get_db),
 ) -> ChatResponse:
     """LLaMA chat endpoint."""
-    return await chat_routes.handle_chat(
+    return await handle_chat(
         user_id=user.id,
         session_id=body.session_id,
         model_key="llama",
@@ -38,7 +38,7 @@ async def get_history(
     db: AsyncSession = Depends(get_db),
 ) -> HistoryResponse:
     """Get chat history for a session."""
-    from app.db.repositories import session_repo
+    from app.db.repositories.session_repo import session_repo
 
     db_session = await session_repo.get_by_session_id(db, session_id, user.id)
 

@@ -14,6 +14,7 @@ _redis: Redis | None = None
 async def init_redis(url: str) -> None:
     """Initialize Redis connection pool."""
     global _redis
+    # from_url handles password extraction automatically when format is redis://[:password@]host[:port][/db]
     _redis = redis.from_url(
         url,
         encoding="utf-8",

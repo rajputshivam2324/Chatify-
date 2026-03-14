@@ -8,15 +8,15 @@ from app.cache.redis_client import check_rate_limit
 from app.core.config import get_settings
 from app.db.repositories.user_repo import user_repo
 
-from ..db.session import get_db
-from ..schemas.auth import UserOut
+from app.db.session import get_db
+from app.schemas.auth import UserOut
 
 settings = get_settings()
 
 
 async def get_current_user(
     request: Request,
-    db: AsyncSession,
+    db: AsyncSession = Depends(get_db),
 ) -> UserOut:
     """Reads user_id from Starlette session, fetches from DB."""
     user_id = request.session.get("user_id")

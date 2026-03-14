@@ -7,10 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.dependencies import get_current_user
-from app.db.repositories import user_repo
+from app.db.repositories.user_repo import user_repo
 from app.schemas.auth import OAuthCallbackResponse, UserOut
 
-from ...db.session import get_db
+from app.db.session import get_db
 
 settings = get_settings()
 
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.get("/google")
 async def login_google(request: Request) -> dict:
     """Redirect to Google OAuth consent URL."""
-    from fastapi import redirect
+    from fastapi.responses import RedirectResponse
 
     oauth2_session = OAuth2Session(
         settings.google_client_id,
@@ -33,8 +33,7 @@ async def login_google(request: Request) -> dict:
         redirect_uri=settings.google_redirect_uri,
     )
 
-    return redirect(str(uri))
-
+    return RedirectResponse(str(uri), status_code=302)
 
 @router.get("/google/callback")
 async def google_callback(
@@ -45,7 +44,8 @@ async def google_callback(
     code = request.query_params.get("code")
 
     if not code:
-        raise ValueError("No code provided")
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="No code provided")
 
     async with httpx.AsyncClient() as client:
         token_response = await client.post(
@@ -60,12 +60,19 @@ async def google_callback(
         )
 
         token_data = token_response.json()
+        if "access_token" not in token_data:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=400, detail="Failed to retrieve access token from Google.")
+            
         access_token = token_data["access_token"]
 
         userinfo_response = await client.get(
             "https://www.googleapis.com/oauth2/v2/userinfo",
             headers={"Authorization": f"Bearer {access_token}"},
         )
+        if userinfo_response.status_code != 200:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=400, detail="Failed to retrieve user info from Google.")
 
         userinfo = userinfo_response.json()
 

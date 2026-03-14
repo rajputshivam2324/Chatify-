@@ -21,6 +21,8 @@ async def generate_image(prompt: str) -> bytes:
     Calls stabilityai/stable-diffusion-xl-base-1.0.
     Returns PNG bytes.
     """
+    from io import BytesIO
+
     client = _get_image_client()
 
     try:
@@ -28,7 +30,10 @@ async def generate_image(prompt: str) -> bytes:
             prompt,
             model="stabilityai/stable-diffusion-xl-base-1.0",
         )
-        return image
+        # Convert PIL Image to bytes
+        buffer = BytesIO()
+        image.save(buffer, format="PNG")
+        return buffer.getvalue()
     except Exception as e:
         raise RuntimeError(f"Image generation failed: {str(e)}")
 
