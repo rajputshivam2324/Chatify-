@@ -1,5 +1,5 @@
 venv
 migrations
 __pycache__
-chroma_db
+chroma_db/
 .env
