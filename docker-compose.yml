@@ -1,0 +1,67 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: chatify_postgres
+    environment:
+      POSTGRES_USER: chatify_user
+      POSTGRES_PASSWORD: your_secure_password
+      POSTGRES_DB: chatify_ai
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U chatify_user -d chatify_ai" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    networks:
+      - chatify_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: chatify_redis
+    command: redis-server --requirepass your_redis_password --maxmemory 256mb --maxmemory-policy allkeys-lru --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    networks:
+      - chatify_net
+
+  app:
+    build: .
+    container_name: chatify_app
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://chatify_user:your_secure_password@postgres:5432/chatify_ai
+      REDIS_URL: redis://:your_redis_password@redis:6379/0
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: always
+    networks:
+      - chatify_net
+
+networks:
+  chatify_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

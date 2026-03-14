@@ -1,0 +1,39 @@
+# FastAPI & Server
+fastapi
+uvicorn[standard]
+python-multipart
+
+# Pydantic & Settings
+pydantic
+pydantic-settings
+email-validator
+
+# Databasex
+sqlalchemy[asyncio]
+asyncpg
+alembic
+
+# Redis
+redis
+
+# Auth
+authlib
+itsdangerous
+
+# HuggingFace & AI
+huggingface-hub
+inference-sdk
+langgraph
+langchain-core
+langchain-huggingface
+
+# FAISS & Embeddings
+faiss-cpu
+sentence-transformers
+
+# Utilities
+python-dotenv
+structlog
+httpx
+pillow
+aiofiles
